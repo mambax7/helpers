@@ -100,7 +100,9 @@ class DefaultUrlGenerator implements UrlGeneratorInterface
         // Validate host to prevent host-header injection
         $host = trim((string) ($_SERVER['HTTP_HOST'] ?? 'localhost'));
 
-        if (!preg_match('/^[A-Za-z0-9.\-]+(?::\d{1,5})?$/', $host)) {
+        if (!preg_match('/^[A-Za-z0-9.\-]+(?::(\d{1,5}))?$/', $host, $matches)) {
+            $host = 'localhost';
+        } elseif (isset($matches[1]) && ((int) $matches[1] < 1 || (int) $matches[1] > 65535)) {
             $host = 'localhost';
         }
 

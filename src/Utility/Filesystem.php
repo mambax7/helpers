@@ -44,6 +44,10 @@ final class Filesystem
      */
     public static function readChunked(string $path, int $chunkSize, callable $callback): bool
     {
+        if ($chunkSize < 1) {
+            return false;
+        }
+
         $handle = @fopen($path, 'rb');
 
         if ($handle === false) {

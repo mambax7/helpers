@@ -168,14 +168,18 @@ final class Config
      */
     public static function save(string $module, array $config): bool
     {
+        if (self::$provider === null) {
+            return false;
+        }
+
+        if (!self::$provider->save($module, $config)) {
+            return false;
+        }
+
         self::$loaded[$module] = $config;
         self::invalidateCache($module);
 
-        if (self::$provider !== null) {
-            return self::$provider->save($module, $config);
-        }
-
-        return false;
+        return true;
     }
 
     /**
@@ -231,7 +235,7 @@ final class Config
         }
 
         // 3. XOOPS global config for system module
-        if ($module === 'system' && isset($GLOBALS['xoopsConfig'])) {
+        if ($module === 'system' && isset($GLOBALS['xoopsConfig']) && is_array($GLOBALS['xoopsConfig'])) {
             return $GLOBALS['xoopsConfig'];
         }
 

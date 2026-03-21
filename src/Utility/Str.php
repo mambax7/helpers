@@ -82,9 +82,10 @@ final class Str
             $title = (string) iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $title);
         }
 
+        $quotedSep = preg_quote($separator, '/');
         $title = (string) preg_replace('/[^\x20-\x7E]/u', '', $title);
-        $title = (string) preg_replace('/[^a-zA-Z0-9\s-]/u', '', $title);
-        $title = (string) preg_replace('/[\s-]+/', $separator, $title);
+        $title = (string) preg_replace('/[^a-zA-Z0-9\s' . $quotedSep . '-]/u', '', $title);
+        $title = (string) preg_replace('/[\s' . $quotedSep . '-]+/', $separator, $title);
 
         return mb_strtolower(trim($title, $separator));
     }
@@ -227,7 +228,10 @@ final class Str
      */
     public static function wordCount(string $string): int
     {
-        return str_word_count($string);
+        // Unicode-safe: matches word characters including non-Latin scripts
+        preg_match_all('/[\p{L}\p{N}]+/u', $string, $matches);
+
+        return count($matches[0]);
     }
 
     /**
