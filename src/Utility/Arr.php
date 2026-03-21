@@ -70,8 +70,10 @@ final class Arr
      */
     public static function has(mixed $target, string|array $keys): bool
     {
+        $sentinel = Value::missing();
+
         foreach ((array) $keys as $key) {
-            $result = self::get($target, $key, new MissingValue());
+            $result = self::get($target, $key, $sentinel);
             if ($result instanceof MissingValue) {
                 return false;
             }
@@ -361,17 +363,24 @@ final class Arr
     /**
      * Filter array items where a key matches a value.
      *
-     * @param array<mixed> $array    Source array
-     * @param string       $key      Key to compare
-     * @param mixed        $operator Comparison operator or value
-     * @param mixed        $value    Value to compare against
+     * Two-argument form: where($array, 'key', $value)     — uses '=' operator
+     * Three-argument form: where($array, 'key', '>=', 10) — explicit operator
+     *
+     * Supports: =, ==, ===, !=, !==, <>, <, >, <=, >=
+     *
+     * @param array<mixed>  $array             Source array
+     * @param string        $key               Key to compare
+     * @param mixed         ...$operatorAndValue Operator and value, or just value
      * @return array<mixed>
      */
-    public static function where(array $array, string $key, mixed $operator, mixed $value = null): array
+    public static function where(array $array, string $key, mixed ...$operatorAndValue): array
     {
-        if ($value === null) {
-            $value = $operator;
+        if (count($operatorAndValue) === 1) {
             $operator = '=';
+            $value = $operatorAndValue[0];
+        } else {
+            $operator = $operatorAndValue[0] ?? '=';
+            $value = $operatorAndValue[1] ?? null;
         }
 
         return array_filter($array, static function ($item) use ($key, $operator, $value) {

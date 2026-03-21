@@ -257,7 +257,7 @@ Date::resetProvider();
 
 ## Architecture
 
-```
+```text
 Tier 0: Utility/       Pure PHP. Zero dependencies. Works anywhere.
 Tier 1: Contracts/     Interfaces only. No implementation.
 Tier 2: Service/       Static facades. Depend on XOOPS constants.

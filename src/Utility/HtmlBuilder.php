@@ -56,12 +56,16 @@ final class HtmlBuilder
                 continue;
             }
 
-            if ($value === true) {
-                $parts[] = self::escape($key);
+            if (!self::isValidName($key)) {
                 continue;
             }
 
-            $parts[] = self::escape($key) . '="' . self::escape((string) $value) . '"';
+            if ($value === true) {
+                $parts[] = $key;
+                continue;
+            }
+
+            $parts[] = $key . '="' . self::escape((string) $value) . '"';
         }
 
         return implode(' ', $parts);
@@ -111,7 +115,10 @@ final class HtmlBuilder
      */
     public static function tag(string $tag, array $attributes = [], ?string $content = null, bool $selfClose = false): string
     {
-        $tag = self::escape($tag);
+        if (!self::isValidName($tag)) {
+            $tag = 'div';
+        }
+
         $attrs = self::attributes($attributes);
         $attrStr = $attrs !== '' ? ' ' . $attrs : '';
 
@@ -128,6 +135,17 @@ final class HtmlBuilder
     public static function escape(string $value): string
     {
         return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
+
+    /**
+     * Validate an HTML tag or attribute name.
+     *
+     * Rejects names containing spaces, quotes, angle brackets, or other
+     * characters that could break out of the tag/attribute context.
+     */
+    private static function isValidName(string $name): bool
+    {
+        return $name !== '' && (bool) preg_match('/^[a-zA-Z_][a-zA-Z0-9\-_:.]*$/', $name);
     }
 
     /**

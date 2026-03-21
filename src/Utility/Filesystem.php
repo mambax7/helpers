@@ -370,20 +370,17 @@ final class Filesystem
                 continue;
             }
 
-            $targetPath = realpath(dirname($realDest . $entryName));
+            // Reject entries with traversal sequences or absolute paths before any filesystem operation
+            $normalized = str_replace('\\', '/', $entryName);
 
-            // Skip entries that would escape the destination directory
-            if ($targetPath === false || !str_starts_with($targetPath . DIRECTORY_SEPARATOR, $realDest)) {
-                // Create parent directory and re-check (entry may be first in its subtree)
-                $parentDir = dirname($realDest . $entryName);
-                self::mkdir($parentDir);
-                $targetPath = realpath($parentDir);
+            if (
+                str_starts_with($normalized, '/')
+                || str_contains($normalized, '../')
+                || preg_match('/^[A-Za-z]:/', $normalized)
+            ) {
+                $zip->close();
 
-                if ($targetPath === false || !str_starts_with($targetPath . DIRECTORY_SEPARATOR, $realDest)) {
-                    $zip->close();
-
-                    return false;
-                }
+                return false;
             }
         }
 
