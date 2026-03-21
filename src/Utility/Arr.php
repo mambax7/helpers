@@ -70,9 +70,15 @@ final class Arr
      */
     public static function has(mixed $target, string|array $keys): bool
     {
+        $keys = (array) $keys;
+
+        if ($keys === []) {
+            return false;
+        }
+
         $sentinel = Value::missing();
 
-        foreach ((array) $keys as $key) {
+        foreach ($keys as $key) {
             $result = self::get($target, $key, $sentinel);
             if ($result instanceof MissingValue) {
                 return false;

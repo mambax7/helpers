@@ -88,8 +88,16 @@ final class Cache
      */
     public static function remember(string $key, int $ttl, callable $callback): mixed
     {
+        // Single backend lookup — avoid has()+get() double read
+        $value = self::get($key);
+
+        if ($value !== null) {
+            return $value;
+        }
+
+        // Distinguish stored-null from miss only when needed
         if (self::has($key)) {
-            return self::get($key);
+            return null;
         }
 
         $value = $callback();

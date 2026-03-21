@@ -117,7 +117,7 @@ final class Filesystem
      */
     public static function mimeType(string $path): ?string
     {
-        if (!file_exists($path)) {
+        if (!file_exists($path) || !function_exists('finfo_open')) {
             return null;
         }
 
