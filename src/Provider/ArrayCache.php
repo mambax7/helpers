@@ -76,7 +76,19 @@ final class ArrayCache implements CacheInterface
 
     public function has(string $key): bool
     {
-        return $this->get($key) !== null;
+        if (!isset($this->store[$key])) {
+            return false;
+        }
+
+        $entry = $this->store[$key];
+
+        if ($entry['expires'] !== 0 && $entry['expires'] < time()) {
+            unset($this->store[$key]);
+
+            return false;
+        }
+
+        return true;
     }
 
     public function many(array $keys, mixed $default = null): array

@@ -169,7 +169,13 @@ final class Arr
             if ($keyKey === null) {
                 $results[] = $itemValue;
             } else {
-                $results[self::get($item, $keyKey)] = $itemValue;
+                $itemKey = self::get($item, $keyKey);
+
+                if (is_int($itemKey) || is_string($itemKey)) {
+                    $results[$itemKey] = $itemValue;
+                } else {
+                    $results[] = $itemValue;
+                }
             }
         }
 

@@ -56,12 +56,13 @@ final class FormatNumberPlugin
     {
         $value = $params['value'] ?? 0;
         $type = (string) ($params['type'] ?? 'decimal');
+        $hasDecimals = array_key_exists('decimals', $params);
         $decimals = (int) ($params['decimals'] ?? 0);
         $locale = isset($params['locale']) ? (string) $params['locale'] : null;
 
         return match ($type) {
-            'filesize' => Number::fileSize((int) $value, $decimals ?: 2),
-            'human' => Number::forHumans((float) $value, $decimals ?: 1),
+            'filesize' => Number::fileSize((int) $value, $hasDecimals ? $decimals : 2),
+            'human' => Number::forHumans((float) $value, $hasDecimals ? $decimals : 1),
             'percentage' => Number::percentage((float) $value, $decimals, $locale),
             'ordinal' => Number::ordinal((int) $value, $locale),
             'currency' => Number::currency(
