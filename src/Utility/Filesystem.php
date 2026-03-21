@@ -54,11 +54,14 @@ final class Filesystem
             return false;
         }
 
+        $ok = true;
+
         try {
             while (!feof($handle)) {
                 $chunk = fread($handle, $chunkSize);
 
                 if ($chunk === false) {
+                    $ok = false;
                     break;
                 }
 
@@ -70,7 +73,7 @@ final class Filesystem
             fclose($handle);
         }
 
-        return true;
+        return $ok;
     }
 
     /**
@@ -222,7 +225,12 @@ final class Filesystem
 
             $path = $directory . DIRECTORY_SEPARATOR . $entry;
 
-            if (is_dir($path)) {
+            // Remove symlinks as files — never follow into external trees
+            if (is_link($path)) {
+                if (!@unlink($path)) {
+                    return false;
+                }
+            } elseif (is_dir($path)) {
                 if (!self::deleteDirectory($path)) {
                     return false;
                 }
@@ -341,6 +349,42 @@ final class Filesystem
 
         if ($zip->open($zipPath) !== true) {
             return false;
+        }
+
+        self::mkdir($destination);
+        $realDest = realpath($destination);
+
+        if ($realDest === false) {
+            $zip->close();
+
+            return false;
+        }
+
+        $realDest = rtrim($realDest, '/\\') . DIRECTORY_SEPARATOR;
+
+        // Validate each entry to prevent Zip Slip (path traversal)
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $entryName = $zip->getNameIndex($i);
+
+            if ($entryName === false) {
+                continue;
+            }
+
+            $targetPath = realpath(dirname($realDest . $entryName));
+
+            // Skip entries that would escape the destination directory
+            if ($targetPath === false || !str_starts_with($targetPath . DIRECTORY_SEPARATOR, $realDest)) {
+                // Create parent directory and re-check (entry may be first in its subtree)
+                $parentDir = dirname($realDest . $entryName);
+                self::mkdir($parentDir);
+                $targetPath = realpath($parentDir);
+
+                if ($targetPath === false || !str_starts_with($targetPath . DIRECTORY_SEPARATOR, $realDest)) {
+                    $zip->close();
+
+                    return false;
+                }
+            }
         }
 
         $result = $zip->extractTo($destination);

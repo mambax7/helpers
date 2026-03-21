@@ -55,7 +55,7 @@ final readonly class Optional
             return null;
         }
 
-        if (!method_exists($this->value, $method)) {
+        if (!is_callable([$this->value, $method])) {
             return null;
         }
 

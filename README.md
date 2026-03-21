@@ -27,12 +27,11 @@ $sitename = Config::get('system.sitename');
 
 ## Requirements
 
-- PHP 8.2 or later
-- No other dependencies (zero runtime requirements beyond PHP)
+- PHP 8.2 or later with the `ext-mbstring` extension
+- No other runtime dependencies
 
 Optional extensions for enhanced functionality:
 - `ext-intl` — locale-aware number and date formatting
-- `ext-mbstring` — multibyte string operations
 - `ext-apcu` — APCu caching backend
 - `ext-zip` — zip/unzip filesystem operations
 
