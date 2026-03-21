@@ -76,10 +76,18 @@ class DefaultUrlGenerator implements UrlGeneratorInterface
     private function getBaseUrl(bool $secure): string
     {
         if (defined('XOOPS_URL')) {
-            $url = XOOPS_URL;
+            $url = (string) XOOPS_URL;
 
             if ($secure) {
-                return str_replace('http://', 'https://', $url);
+                /** @var array<string, string|int>|false $parts */
+                $parts = parse_url($url);
+
+                if (is_array($parts) && isset($parts['host']) && is_string($parts['host'])) {
+                    $port = isset($parts['port']) ? ':' . (int) $parts['port'] : '';
+                    $path = isset($parts['path']) && is_string($parts['path']) ? $parts['path'] : '';
+
+                    return 'https://' . $parts['host'] . $port . $path;
+                }
             }
 
             return $url;
@@ -89,7 +97,12 @@ class DefaultUrlGenerator implements UrlGeneratorInterface
             ? 'https'
             : ((($_SERVER['HTTPS'] ?? 'off') !== 'off') ? 'https' : 'http');
 
-        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        // Validate host to prevent host-header injection
+        $host = trim((string) ($_SERVER['HTTP_HOST'] ?? 'localhost'));
+
+        if (!preg_match('/^[A-Za-z0-9.\-]+(?::\d{1,5})?$/', $host)) {
+            $host = 'localhost';
+        }
 
         return $scheme . '://' . $host;
     }

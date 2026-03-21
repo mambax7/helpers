@@ -72,7 +72,13 @@ final class XoopsCollection extends Collection
             if ($keyKey === null) {
                 $results[] = $value;
             } else {
-                $results[self::getObjectVar($item, $keyKey)] = $value;
+                $resolvedKey = self::getObjectVar($item, $keyKey);
+
+                if (is_int($resolvedKey) || is_string($resolvedKey)) {
+                    $results[$resolvedKey] = $value;
+                } else {
+                    $results[] = $value;
+                }
             }
         }
 
@@ -113,9 +119,11 @@ final class XoopsCollection extends Collection
             return $item->getVar($key);
         }
 
-        // Generic object property
+        // Generic object — use get_object_vars() to avoid private/protected access errors
         if (is_object($item)) {
-            return $item->{$key} ?? null;
+            $publicProps = get_object_vars($item);
+
+            return $publicProps[$key] ?? null;
         }
 
         // Array access

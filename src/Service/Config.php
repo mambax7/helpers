@@ -244,6 +244,11 @@ final class Config
      */
     private static function loadFromFile(string $module): array
     {
+        // Prevent path traversal attacks
+        if (preg_match('/[\/\\\\]|\.\./', $module)) {
+            return [];
+        }
+
         $candidates = [];
 
         if (defined('XOOPS_VAR_PATH')) {

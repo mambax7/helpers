@@ -88,10 +88,8 @@ final class Cache
      */
     public static function remember(string $key, int $ttl, callable $callback): mixed
     {
-        $value = self::get($key);
-
-        if ($value !== null) {
-            return $value;
+        if (self::has($key)) {
+            return self::get($key);
         }
 
         $value = $callback();

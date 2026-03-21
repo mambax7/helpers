@@ -61,7 +61,7 @@ final class CssClassesPlugin
         $classes = $params['classes'] ?? [];
 
         if (!is_array($classes)) {
-            return (string) $classes;
+            return HtmlBuilder::escape((string) $classes);
         }
 
         return HtmlBuilder::classes($classes);

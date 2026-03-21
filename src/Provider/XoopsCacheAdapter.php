@@ -44,9 +44,18 @@ class XoopsCacheAdapter implements CacheInterface
         $prefixed = $this->prefix . $key;
 
         if (class_exists('XoopsCache', false)) {
-            $value = \XoopsCache::read($prefixed);
+            $payload = \XoopsCache::read($prefixed);
 
-            return $value !== false ? $value : null;
+            if (
+                $payload === false
+                || !is_array($payload)
+                || !array_key_exists('value', $payload)
+                || ($payload['__xmf_hit'] ?? false) !== true
+            ) {
+                return null;
+            }
+
+            return $payload['value'];
         }
 
         if ($this->apcuAvailable()) {
@@ -63,7 +72,7 @@ class XoopsCacheAdapter implements CacheInterface
         $prefixed = $this->prefix . $key;
 
         if (class_exists('XoopsCache', false)) {
-            return \XoopsCache::write($prefixed, $value, $ttl);
+            return \XoopsCache::write($prefixed, ['__xmf_hit' => true, 'value' => $value], $ttl);
         }
 
         if ($this->apcuAvailable()) {
@@ -147,7 +156,8 @@ class XoopsCacheAdapter implements CacheInterface
             return null;
         }
 
-        $data = @unserialize($content, ['allowed_classes' => true]);
+        // File backend only supports scalar/array payloads — disallow object instantiation
+        $data = @unserialize($content, ['allowed_classes' => false]);
 
         if (!is_array($data) || !array_key_exists('value', $data)) {
             return null;

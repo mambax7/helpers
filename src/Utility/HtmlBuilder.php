@@ -91,10 +91,10 @@ final class HtmlBuilder
         foreach ($classes as $class => $condition) {
             if (is_int($class)) {
                 // Numeric key: $condition is the class name (always included)
-                $result[] = (string) $condition;
+                $result[] = self::escape((string) $condition);
             } elseif ($condition) {
                 // String key: include class only if condition is truthy
-                $result[] = $class;
+                $result[] = self::escape($class);
             }
         }
 

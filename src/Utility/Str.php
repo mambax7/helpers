@@ -24,7 +24,8 @@ namespace Xoops\Helpers\Utility;
  * String utility helpers.
  *
  * Provides case conversion, slug generation, validation,
- * and manipulation methods. All operations are UTF-8 safe.
+ * and manipulation methods. Most operations use mbstring
+ * for UTF-8 safety where applicable.
  */
 final class Str
 {
@@ -121,10 +122,16 @@ final class Str
      */
     public static function contains(string $haystack, string|array $needles, bool $ignoreCase = false): bool
     {
-        $function = $ignoreCase ? 'mb_stripos' : 'mb_strpos';
-
         foreach ((array) $needles as $needle) {
-            if ($needle !== '' && $function($haystack, $needle) !== false) {
+            if ($needle === '') {
+                continue;
+            }
+
+            $found = $ignoreCase
+                ? mb_stripos($haystack, $needle, 0, 'UTF-8')
+                : mb_strpos($haystack, $needle, 0, 'UTF-8');
+
+            if ($found !== false) {
                 return true;
             }
         }
@@ -175,18 +182,18 @@ final class Str
             return $subject;
         }
 
-        $startPos = mb_strpos($subject, $from);
+        $startPos = mb_strpos($subject, $from, 0, 'UTF-8');
         if ($startPos === false) {
             return $subject;
         }
 
-        $startPos += mb_strlen($from);
-        $endPos = mb_strpos($subject, $to, $startPos);
+        $startPos += mb_strlen($from, 'UTF-8');
+        $endPos = mb_strpos($subject, $to, $startPos, 'UTF-8');
         if ($endPos === false) {
             return $subject;
         }
 
-        return mb_substr($subject, $startPos, $endPos - $startPos);
+        return mb_substr($subject, $startPos, $endPos - $startPos, 'UTF-8');
     }
 
     /**

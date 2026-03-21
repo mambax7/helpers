@@ -53,7 +53,10 @@ final class AssetUrlPlugin
     public static function render(array $params, object $smarty): string
     {
         $path = (string) ($params['path'] ?? '');
-        $secure = (bool) ($params['secure'] ?? false);
+        $secureParam = $params['secure'] ?? false;
+        $secure = is_bool($secureParam)
+            ? $secureParam
+            : (filter_var($secureParam, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false);
 
         return Url::asset($path, $secure);
     }

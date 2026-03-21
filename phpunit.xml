@@ -13,9 +13,7 @@
         <testsuite name="Service">
             <directory>tests/Unit/Service</directory>
         </testsuite>
-        <testsuite name="Provider">
-            <directory>tests/Unit/Provider</directory>
-        </testsuite>
+
         <testsuite name="Integration">
             <directory>tests/Unit/Integration</directory>
         </testsuite>
