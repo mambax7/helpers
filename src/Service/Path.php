@@ -95,6 +95,48 @@ final class Path
         return self::locator()->themePath($name, $path);
     }
 
+    /**
+     * Resolve the path to a module language file with English fallback.
+     *
+     * Checks for the file in the requested language directory first.
+     * Falls back to 'english' if the language-specific file does not exist.
+     * Returns the primary (most specific) path if neither file exists,
+     * so the caller can handle a missing file in the normal way.
+     *
+     * Replaces the standard XOOPS boilerplate:
+     *
+     *   // Old — 6 lines, XOOPS_ROOT_PATH repeated 4 times
+     *   $f = XOOPS_ROOT_PATH . '/modules/' . $dir . '/language/' . $lang . '/main.php';
+     *   if (!is_file($f) && $lang !== 'english') {
+     *       $f = XOOPS_ROOT_PATH . '/modules/' . $dir . '/language/english/main.php';
+     *   }
+     *
+     *   // New — one line
+     *   $f = Path::languageFile($dir, $lang, 'main.php');
+     *
+     * @param string $dirname  Module directory name
+     * @param string $language Language code (e.g. 'english', 'french')
+     * @param string $file     Filename within the language directory (e.g. 'main.php')
+     */
+    public static function languageFile(string $dirname, string $language, string $file): string
+    {
+        $primary = self::module($dirname, 'language/' . $language . '/' . $file);
+
+        if (is_file($primary)) {
+            return $primary;
+        }
+
+        if ($language !== 'english') {
+            $fallback = self::module($dirname, 'language/english/' . $file);
+
+            if (is_file($fallback)) {
+                return $fallback;
+            }
+        }
+
+        return $primary;
+    }
+
     private static function locator(): PathLocatorInterface
     {
         return self::$locator ??= new DefaultPathLocator();

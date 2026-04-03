@@ -67,6 +67,61 @@ final class PathTest extends TestCase
         self::assertStringContainsString('starter', $result);
     }
 
+    // ── languageFile() ──────────────────────────────────────
+
+    public function testLanguageFileReturnsPrimaryWhenItExists(): void
+    {
+        // Build a temp module structure under XOOPS_ROOT_PATH
+        $moduleDir  = XOOPS_ROOT_PATH . '/modules/testlang/language/en_US';
+        @mkdir($moduleDir, 0777, true);
+        $file = $moduleDir . '/main.php';
+        file_put_contents($file, '<?php');
+
+        try {
+            $result = Path::languageFile('testlang', 'en_US', 'main.php');
+            self::assertStringContainsString('en_US', $result);
+            self::assertStringContainsString('main.php', $result);
+        } finally {
+            @unlink($file);
+            @rmdir($moduleDir);
+        }
+    }
+
+    public function testLanguageFileFallsBackToEnglishWhenPrimaryMissing(): void
+    {
+        $englishDir = XOOPS_ROOT_PATH . '/modules/testlang/language/english';
+        @mkdir($englishDir, 0777, true);
+        $file = $englishDir . '/main.php';
+        file_put_contents($file, '<?php');
+
+        try {
+            // Request 'fr_FR' which doesn't exist, so fallback to 'english'
+            $result = Path::languageFile('testlang', 'fr_FR', 'main.php');
+            self::assertStringContainsString('english', $result);
+            self::assertStringContainsString('main.php', $result);
+        } finally {
+            @unlink($file);
+            @rmdir($englishDir);
+        }
+    }
+
+    public function testLanguageFileReturnsPrimaryWhenNeitherExists(): void
+    {
+        // Neither primary nor english file exists — returns the primary path string
+        $result = Path::languageFile('nonexistent_mod', 'fr_FR', 'missing.php');
+        self::assertStringContainsString('fr_FR', $result);
+        self::assertStringContainsString('missing.php', $result);
+    }
+
+    public function testLanguageFileSkipsEnglishFallbackForEnglishLanguage(): void
+    {
+        // Requesting 'english' directly should return the primary (english) path,
+        // never attempting a second fallback to itself
+        $result = Path::languageFile('testlang', 'english', 'main.php');
+        self::assertStringContainsString('english', $result);
+        self::assertStringContainsString('main.php', $result);
+    }
+
     public function testCustomLocator(): void
     {
         $mock = new class implements PathLocatorInterface {

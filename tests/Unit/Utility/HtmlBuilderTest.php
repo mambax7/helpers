@@ -100,4 +100,59 @@ final class HtmlBuilderTest extends TestCase
         $result = HtmlBuilder::script('/js/app.js');
         self::assertSame('<script src="/js/app.js"></script>', $result);
     }
+
+    // ── text() ──────────────────────────────────────────────
+
+    public function testTextEscapesHtmlEntities(): void
+    {
+        self::assertSame('&lt;script&gt;alert(1)&lt;/script&gt;', HtmlBuilder::text('<script>alert(1)</script>'));
+    }
+
+    public function testTextProducesSameResultAsEscape(): void
+    {
+        $input = '"Hello" & <World>';
+        self::assertSame(HtmlBuilder::escape($input), HtmlBuilder::text($input));
+    }
+
+    public function testTextEscapesAmpersand(): void
+    {
+        self::assertSame('a&amp;b', HtmlBuilder::text('a&b'));
+    }
+
+    public function testTextEscapesDoubleQuotes(): void
+    {
+        self::assertSame('say &quot;hi&quot;', HtmlBuilder::text('say "hi"'));
+    }
+
+    public function testTextLeavesPlainStringUnchanged(): void
+    {
+        self::assertSame('Hello World', HtmlBuilder::text('Hello World'));
+    }
+
+    public function testTextEscapesXssPayload(): void
+    {
+        $xss = '"><img src=x onerror=alert(1)>';
+        $result = HtmlBuilder::text($xss);
+        self::assertStringNotContainsString('<img', $result);
+        self::assertStringContainsString('&lt;img', $result);
+    }
+
+    public function testRecommendedSafePatternTagWithText(): void
+    {
+        // The documented safe pattern: HtmlBuilder::tag($tag, $attrs, HtmlBuilder::text($userInput))
+        $payload = '<script>alert("xss")</script>';
+        $result  = HtmlBuilder::tag('div', ['class' => 'alert'], HtmlBuilder::text($payload));
+
+        // The outer tag and its attribute must be present
+        self::assertStringStartsWith('<div', $result);
+        self::assertStringContainsString('class="alert"', $result);
+        // The user payload must be escaped inside the tag body
+        self::assertStringNotContainsString('<script>', $result);
+        self::assertStringContainsString('&lt;script&gt;', $result);
+        // Full expected output
+        self::assertSame(
+            '<div class="alert">&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;</div>',
+            $result,
+        );
+    }
 }

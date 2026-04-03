@@ -109,8 +109,11 @@ final class HtmlBuilder
      * Build a complete HTML tag.
      *
      * @param string                                     $tag        Tag name (e.g. "div", "span", "input")
-     * @param array<string, string|bool|int|float|null>  $attributes Tag attributes
-     * @param string|null                                $content    Inner HTML (NOT escaped — pass pre-escaped content)
+     * @param array<string, string|bool|int|float|null>  $attributes Tag attributes — all values escaped automatically
+     * @param string|null                                $content    Inner HTML — NOT escaped automatically.
+     *                                                               Use text($value) for user-supplied strings;
+     *                                                               pass trusted HTML (rendered markup, template
+     *                                                               fragments) directly to avoid double-escaping.
      * @param bool                                       $selfClose  Self-closing tag (e.g. <input />)
      */
     public static function tag(string $tag, array $attributes = [], ?string $content = null, bool $selfClose = false): string
@@ -131,10 +134,33 @@ final class HtmlBuilder
 
     /**
      * Escape a string for safe HTML output.
+     *
+     * Use for attribute values. For text content inside a tag body,
+     * prefer text() which communicates intent at the call site.
      */
     public static function escape(string $value): string
     {
         return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
+
+    /**
+     * Escape a string for safe use as HTML text content.
+     *
+     * Use this when inserting user-supplied plain text into a tag body.
+     * tag() does NOT escape content automatically — call this method
+     * to make the intent explicit and the escaping visible.
+     *
+     *   // User-supplied text → call text()
+     *   echo HtmlBuilder::tag('p', [], HtmlBuilder::text($userComment));
+     *
+     *   // Trusted HTML → omit text(), content renders as markup
+     *   echo HtmlBuilder::tag('div', ['class' => 'body'], $renderedHtmlBlock);
+     *
+     * @see escape() for attribute value escaping
+     */
+    public static function text(string $value): string
+    {
+        return self::escape($value);
     }
 
     /**

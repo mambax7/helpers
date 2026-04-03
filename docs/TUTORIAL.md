@@ -2,7 +2,7 @@
 
 ## Stop Writing Boilerplate. Start Building Features.
 
-Every XOOPS module developer knows the drill. You need a URL to a module page, so you write:
+Every XOOPS module developer knows the drill. You need a URL to a module page:
 
 ```php
 // kernel/notification.php:741
@@ -45,6 +45,104 @@ $html = HtmlBuilder::attributes(['data-name' => $sitename, 'href' => $clickurl])
 
 ---
 
+## Security by Design
+
+Those three `htmlspecialchars()` calls above are not just boilerplate — each one is a gap where a future developer can introduce a stored XSS vulnerability by forgetting it once. One missed call on a user profile link is enough to compromise an entire admin panel. The `htmlspecialchars` pattern appears **30+ times** in the XOOPS Core alone. That is 30+ places where correctness depends entirely on developer discipline rather than on the architecture.
+
+XOOPS Helpers closes those gaps structurally. `HtmlBuilder` escapes all attribute values automatically. You cannot forget it because there is nothing to forget — escaping is what the method does, not an option you have to remember to pass.
+
+**The contract:** `HtmlBuilder` escapes all **attribute values and class names** automatically. Tag **content** is your responsibility — intentionally, because content can legitimately contain HTML (rendered markup, template fragments, trusted output from a WYSIWYG editor). The library does not guess your intent.
+
+**Old way — unsafe attribute output, nothing to stop you forgetting:**
+
+```php
+// One forgotten htmlspecialchars call on an attribute = stored XSS
+$button = "<button data-name='" . $userInput . "' data-url='" . $clickUrl . "'>";
+```
+
+**New way — attribute escaping is automatic, content escaping is explicit:**
+
+```php
+// Attributes: escaped automatically — no flags, no charset, no risk
+$button = '<button ' . HtmlBuilder::attributes([
+    'data-name' => $userInput,
+    'data-url'  => $clickUrl,
+]) . '>';
+
+// Tag content: call text() for user-supplied strings — escaping is visible at the call site
+echo HtmlBuilder::tag(
+    'div',
+    ['class' => 'alert alert-info'],
+    HtmlBuilder::text($userMessage)     // <-- your responsibility, made explicit
+);
+
+// Tag content: pass trusted HTML directly — text() would double-escape rendered markup
+echo HtmlBuilder::tag('div', ['class' => 'content'], $renderedHtmlBlock);
+```
+
+This is not a convenience feature. It is an architectural contract: the library carries the burden for attributes — the source of most real-world XSS — and makes content escaping an explicit, visible call rather than a discipline that can be silently forgotten.
+
+---
+
+## Table of Contents
+
+0. [Security by Design](#security-by-design)
+1. [Installation](#1-installation)
+2. [URL Generation — Never Concatenate Again](#2-url-generation) · [Tier 2](#architecture-at-a-glance)
+3. [Path Resolution — Cross-Platform, Always Correct](#3-path-resolution) · [Tier 2](#architecture-at-a-glance)
+4. [Configuration — Dot Notation, Zero Globals](#4-configuration) · [Tier 2](#architecture-at-a-glance)
+5. [Array Superpowers — Dot Notation for Everything](#5-array-superpowers) · [Tier 0](#architecture-at-a-glance)
+6. [String Utilities — Slugs, Validation, Case Conversion](#6-string-utilities) · [Tier 0](#architecture-at-a-glance)
+7. [Number Formatting — Human-Readable Everything](#7-number-formatting) · [Tier 0](#architecture-at-a-glance)
+8. [HTML Builder — XSS Eliminated by Design](#8-html-builder) · [Tier 0](#architecture-at-a-glance)
+9. [Collections — Fluent Data Transformation](#9-collections) · [Tier 0](#architecture-at-a-glance)
+10. [Pipeline — Clean Data Processing](#10-pipeline) · [Tier 0](#architecture-at-a-glance)
+11. [Fluent Strings — Chain Everything](#11-fluent-strings) · [Tier 0](#architecture-at-a-glance)
+12. [Date Utilities — Testable Time](#12-date-utilities) · [Tier 0](#architecture-at-a-glance)
+13. [File Operations — JSON, MIME, Zip in One Line](#13-file-operations) · [Tier 0](#architecture-at-a-glance)
+14. [Caching — Multi-Tier, Zero Config](#14-caching) · [Tier 2](#architecture-at-a-glance) / [Tier 3](#architecture-at-a-glance)
+15. [Error Recovery — Retry and Rescue](#15-error-recovery) · [Tier 0](#architecture-at-a-glance)
+16. [Environment Detection](#16-environment-detection) · [Tier 0](#architecture-at-a-glance)
+17. [Smarty Template Plugins](#17-smarty-template-plugins) · [Tier 4](#architecture-at-a-glance)
+18. [Benchmarking — Know What's Slow](#18-benchmarking) · [Tier 0](#architecture-at-a-glance)
+19. [Testing — Everything is Mockable](#19-testing)
+
+---
+
+## 1. Installation
+
+```bash
+composer require xoops/helpers
+```
+
+That's it. No configuration files. No bootstrap calls. No service registration. It just works.
+
+```php
+use Xoops\Helpers\Service\Path;
+
+echo Path::base();  // Outputs XOOPS_ROOT_PATH immediately
+```
+
+**Optional global function shortcuts** — `collect()`, `str()`, `pipeline()`, `tap()`, `retry()`, `env()`, etc. are available via `src/functions.php` but are not auto-loaded. Opt in explicitly.
+
+The recommended pattern is to load the file **once per request** in your XOOPS bootstrap rather than in individual module files. This prevents redundant `require` calls when multiple modules use the helpers in the same request:
+
+```php
+// Best: add once to mainfile.php or a central preload script
+if (file_exists(XOOPS_ROOT_PATH . '/vendor/xoops/helpers/src/functions.php')) {
+    require_once XOOPS_ROOT_PATH . '/vendor/xoops/helpers/src/functions.php';
+}
+```
+
+If you are building a single module and do not control the bootstrap:
+
+```php
+// Per-module fallback — safe due to function_exists() guards in the file
+require_once 'vendor/xoops/helpers/src/functions.php';
+```
+
+---
+
 ## Relationship with XMF 2.0
 
 XOOPS Helpers is designed to be a **companion** to XMF 2.0 (`xoops/xmf`), not a replacement. They occupy different layers:
@@ -77,48 +175,56 @@ XOOPS Helpers is designed to be a **companion** to XMF 2.0 (`xoops/xmf`), not a 
 
 ---
 
-## Table of Contents
+## Migrating from XMF 1.x
 
-1. [Installation](#1-installation)
-2. [URL Generation — Never Concatenate Again](#2-url-generation)
-3. [Path Resolution — Cross-Platform, Always Correct](#3-path-resolution)
-4. [Configuration — Dot Notation, Zero Globals](#4-configuration)
-5. [Array Superpowers — Dot Notation for Everything](#5-array-superpowers)
-6. [String Utilities — Slugs, Validation, Case Conversion](#6-string-utilities)
-7. [Number Formatting — Human-Readable Everything](#7-number-formatting)
-8. [HTML Builder — XSS Eliminated by Design](#8-html-builder)
-9. [Collections — Fluent Data Transformation](#9-collections)
-10. [Pipeline — Clean Data Processing](#10-pipeline)
-11. [Fluent Strings — Chain Everything](#11-fluent-strings)
-12. [Date Utilities — Testable Time](#12-date-utilities)
-13. [File Operations — JSON, MIME, Zip in One Line](#13-file-operations)
-14. [Caching — Multi-Tier, Zero Config](#14-caching)
-15. [Error Recovery — Retry and Rescue](#15-error-recovery)
-16. [Environment Detection](#16-environment-detection)
-17. [Smarty Template Plugins](#17-smarty-template-plugins)
-18. [Benchmarking — Know What's Slow](#18-benchmarking)
-19. [Testing — Everything is Mockable](#19-testing)
+You do not need to refactor existing XMF 1.x code before adopting this library. Both coexist safely with zero namespace conflicts. The decision of when to migrate a given file is straightforward:
 
----
+**Starting a new module** — use XOOPS Helpers exclusively. There is no legacy to consider and you get automatic escaping, dot-notation config, and fluent collections from day one.
 
-## 1. Installation
+**Actively developing an existing module** — use XOOPS Helpers for all new code. When you open an existing file to add a feature, convert the XMF 1.x patterns in that file as you go. Do not schedule a dedicated refactoring sprint — let the migration happen organically when you have a reason to touch the file anyway.
 
-```bash
-composer require xoops/helpers
-```
+**Maintaining a stable module** — do nothing. The libraries coexist. Migration cost is not justified by a pure maintenance ticket. Wait until the file needs to be opened for another reason.
 
-That's it. No configuration files. No bootstrap calls. No service registration. It just works.
+The most common migration is the cache pattern, which also reduces line count the most:
 
 ```php
-use Xoops\Helpers\Service\Path;
+// XMF 1.x — before (5 lines, null-check pattern)
+if (!$moduleConfig = \XoopsCache::read("{$dirname}_config")) {
+    $moduleConfig = xoops_getModuleConfig($dirname);
+    \XoopsCache::write("{$dirname}_config", $moduleConfig);
+}
 
-echo Path::base();  // Outputs XOOPS_ROOT_PATH immediately
+// XOOPS Helpers — after (1 line, same behavior)
+$moduleConfig = Cache::remember("{$dirname}_config", 3600, fn() => xoops_getModuleConfig($dirname));
 ```
 
-**Optional:** If you want global function shortcuts like `collect()`, `str()`, `pipeline()`:
+The config accessor pattern is the second most common:
 
 ```php
-require_once 'vendor/xoops/helpers/src/functions.php';
+// XMF 1.x — before
+$helper   = \XoopsModules\Mymod\Helper::getInstance();
+$perPage  = $helper->getConfig('items_per_page');
+$showTags = $helper->getConfig('show_tags');
+
+// XOOPS Helpers — after
+$perPage  = Config::get('mymod.items_per_page');
+$showTags = Config::get('mymod.show_tags');
+```
+
+URL generation is the third, and it also closes a subtle encoding gap. XMF 1.x's `$helper->url()` is module-scoped and does not encode query parameters — query strings assembled alongside it by hand often skip `http_build_query()`:
+
+```php
+// XMF 1.x — before (query string built by hand, no parameter encoding)
+$helper  = \XoopsModules\Mymod\Helper::getInstance();
+$baseUrl = $helper->url('article.php');
+$pageUrl = $baseUrl . '?id=' . $id . '&cat=' . $cat . '&sort=' . $sort;
+
+// XOOPS Helpers — after (parameters encoded automatically)
+$pageUrl = Url::module('mymod', 'article.php', [
+    'id'   => $id,
+    'cat'  => $cat,
+    'sort' => $sort,
+]);
 ```
 
 ---
@@ -553,9 +659,13 @@ echo HtmlBuilder::classes([
 ]);
 // => "btn btn-primary btn-lg"
 
-// Complete tags
-echo HtmlBuilder::tag('div', ['class' => 'alert alert-info'], $message);
-// => <div class="alert alert-info">Your message here</div>
+// Complete tags — user-supplied text must go through text()
+echo HtmlBuilder::tag('div', ['class' => 'alert alert-info'], HtmlBuilder::text($message));
+// => <div class="alert alert-info">Your message here (safely escaped)</div>
+
+// Trusted HTML block — e.g. output already produced by another HtmlBuilder call
+echo HtmlBuilder::tag('div', ['class' => 'card-body'], $renderedHtmlBlock);
+// => <div class="card-body">[trusted inner HTML, not double-escaped]</div>
 
 // Self-closing tags
 echo HtmlBuilder::tag('input', ['type' => 'text', 'name' => 'q', 'value' => $query], selfClose: true);
@@ -567,7 +677,10 @@ echo HtmlBuilder::script('/js/app.js', ['defer' => true]);
 echo HtmlBuilder::meta(['name' => 'description', 'content' => $description]);
 ```
 
-**XSS eliminated by design.** You cannot forget to escape — HtmlBuilder does it automatically.
+**XSS split by design.** Attribute values and class names are escaped automatically — you
+cannot forget those. Tag content is your responsibility: use `HtmlBuilder::text($value)` for
+user-supplied strings, and pass trusted HTML blocks (rendered markup, translated strings that
+have already been escaped upstream) directly.
 
 ---
 
@@ -942,6 +1055,9 @@ class MyModuleTest extends TestCase
 
 | Task | Old Way | New Way |
 |------|---------|---------|
+| HTML attributes | Manual `htmlspecialchars` per attribute | `HtmlBuilder::attributes([...])` |
+| Escape HTML | `htmlspecialchars($v, ENT_QUOTES\|ENT_HTML5, 'UTF-8')` | `HtmlBuilder::escape($v)` |
+| CSS classes | Ternary concatenation | `HtmlBuilder::classes([...])` |
 | Module URL | `XOOPS_URL.'/modules/'.$dir.'/page.php?id='.$id` | `Url::module($dir, 'page.php', ['id' => $id])` |
 | Module path | `XOOPS_ROOT_PATH.'/modules/'.$dir.'/class'` | `Path::module($dir, 'class')` |
 | Deep array access | `isset($a['x']['y']) ? $a['x']['y'] : 'def'` | `Arr::get($a, 'x.y', 'def')` |
@@ -949,44 +1065,181 @@ class MyModuleTest extends TestCase
 | System config | `$GLOBALS['xoopsConfig']['sitename']` | `Config::get('system.sitename')` |
 | Generate slug | 4-line preg_replace chain | `Str::slug($title)` |
 | File size display | 10-line loop function | `Number::fileSize($bytes)` |
-| HTML attributes | Manual htmlspecialchars per attribute | `HtmlBuilder::attributes([...])` |
-| CSS classes | Ternary concatenation | `HtmlBuilder::classes([...])` |
 | JSON file read | `json_decode(file_get_contents(...), true)` | `Filesystem::readJson($path)` |
 | Extract column | `foreach ($items as $i) { $out[] = $i['name']; }` | `Arr::pluck($items, 'name')` |
 | Cache with fallback | 5-line if/read/write pattern | `Cache::remember($key, $ttl, $fn)` |
 | Retry operation | 15-line while/try/catch loop | `Retry::retry(3, $callback, 500)` |
 | Random string | `bin2hex(random_bytes($n / 2))` | `Str::random(32)` |
-| Escape HTML | `htmlspecialchars($v, ENT_QUOTES\|ENT_HTML5, 'UTF-8')` | `HtmlBuilder::escape($v)` |
+
+---
+
+## Appendix: Other Useful Helpers
+
+These utilities are part of the library but do not appear in the main sections above. They are compositional helpers — they support other patterns rather than being primary use cases on their own.
+
+### Value — Resolve, Inspect, Guard
+
+```php
+use Xoops\Helpers\Utility\Value;
+
+// Resolve a value that might be a Closure or a literal
+$label = Value::value($config['label'] ?? fn() => xoops_getModuleInfo('name'));
+
+// Blank/filled — smarter than empty(): 0 and false are NOT blank
+Value::blank('');          // true
+Value::blank('  ');        // true  (whitespace-only)
+Value::blank(0);           // false (numeric values are never blank)
+Value::blank(false);       // false (booleans are never blank)
+Value::filled($username);  // true if not blank
+
+// Null-safe property access — no more isset() chains
+$email = Value::optional($user)?->getVar('email');
+$city  = Value::optional($profile)?->getVar('city') ?? 'Unknown';
+
+// Memoize an expensive call within a request
+$siteConfig = Value::once(fn() => xoops_getModuleConfig('system'));
+
+// Distinguish "key missing" from "key is null" in Arr::get()
+$sentinel = Value::missing();
+$val = Arr::get($data, 'optional_key', $sentinel);
+if ($val instanceof \Xoops\Helpers\Utility\MissingValue) {
+    // key was not present at all — different from $val === null
+}
+```
+
+### Data — Convert Between Shapes
+
+```php
+use Xoops\Helpers\Utility\Data;
+
+// stdClass response from an API or XoopsObject::toArray() alternative
+$array  = Data::toArray($stdClassResponse);
+$object = Data::toObject($configArray);
+
+// Query strings — useful for building redirect URLs or API calls
+$qs     = Data::toQueryString(['fct' => 'preferences', 'op' => 'showmod', 'mod' => $mid]);
+// => "fct=preferences&op=showmod&mod=42"
+
+$params = Data::fromQueryString($_SERVER['QUERY_STRING'] ?? '');
+```
+
+### Transform — Conditional Value Processing
+
+```php
+use Xoops\Helpers\Utility\Transform;
+
+// Apply a callback only when the value is filled (not blank)
+// Returns $default if blank — replaces common ternary patterns
+$slug = Transform::transform(
+    $article->getVar('custom_slug'),
+    fn($s) => Str::slug($s),
+    fn() => Str::slug($article->getVar('title'))  // default: generate from title
+);
+
+// Predicate-based branching in a chain
+$display = Transform::when(
+    $article->getVar('views'),
+    fn($v) => $v > 1000,
+    fn($v) => Number::forHumans($v),   // "1.2K"
+    fn()   => '< 1K'
+);
+```
+
+### Tap — Side Effects Without Breaking a Chain
+
+```php
+use Xoops\Helpers\Utility\Tap;
+use Xoops\Helpers\Traits\Tappable;  // add tap() to any class
+
+// Log or debug without interrupting a value chain
+$user = Tap::tap(
+    $userHandler->get($uid),
+    fn($u) => xoops_error("Loaded user: " . $u->getVar('uname'))
+);
+
+// The Tappable trait adds ->tap() to any class you own
+class ArticleRepository {
+    use Tappable;
+
+    public function findPublished(): static {
+        // ... query ...
+        return $this;
+    }
+}
+
+$articles = (new ArticleRepository())
+    ->findPublished()
+    ->tap(fn($repo) => $logger->info("Query: {$repo->lastQuery()}"))
+    ->sortBy('date');
+```
+
+### Path::languageFile() — Language Fallback in One Line
+
+```php
+use Xoops\Helpers\Service\Path;
+
+// Old — 6 lines, path string repeated 4 times
+$file = XOOPS_ROOT_PATH . '/modules/' . $dirname . '/language/' . $language . '/blocks.php';
+if (!is_file($file) && $language !== 'english') {
+    $file = XOOPS_ROOT_PATH . '/modules/' . $dirname . '/language/english/blocks.php';
+}
+if (is_file($file)) {
+    include_once $file;
+}
+
+// New — two lines
+$file = Path::languageFile($dirname, $language, 'blocks.php');
+if (is_file($file)) { include_once $file; }
+
+// Common language files by convention
+$language = $GLOBALS['xoopsConfig']['language'] ?? 'english';
+Path::languageFile($dirname, $language, 'main.php');
+Path::languageFile($dirname, $language, 'blocks.php');
+Path::languageFile($dirname, $language, 'admin.php');
+```
 
 ---
 
 ## Architecture at a Glance
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Your Module                             │
-│                                                                 │
-│  use Xoops\Helpers\Service\{Path, Url, Config, Cache};          │
-│  use Xoops\Helpers\Utility\{Arr, Str, Number, Collection};      │
-│  use Xoops\Helpers\Utility\{Pipeline, Stringable, HtmlBuilder}; │
-└───────────┬──────────────────────────────┬──────────────────────┘
-            │                              │
-            ▼                              ▼
-┌──────────────────────┐   ┌──────────────────────────────────────┐
-│   xoops/helpers      │   │  xoops/xmf (2.0)                     │
-│                      │   │                                      │
-│  Tier 0: Utility/    │◄──│  "requires" xoops/helpers            │
-│  Tier 1: Contracts/  │   │                                      │
-│  Tier 2: Service/    │   │  Repository, EventBus, Container,    │
-│  Tier 3: Provider/   │   │  QueryBuilder, CacheManager,         │
-│  Tier 4: Integration/│   │  ConfigManager, Presentation...      │
-└──────────────────────┘   └──────────────────────────────────────┘
-            │                              │
-            ▼                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  XOOPS Core                                                     │
-│  (XOOPS_ROOT_PATH, XOOPS_URL, XoopsCache, XoopsObject)          │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    Module["**Your Module**
+    use Xoops\\Helpers\\Service\\{Path, Url, Config, Cache}
+    use Xoops\\Helpers\\Utility\\{Arr, Str, Number, Collection}
+    use Xoops\\Helpers\\Utility\\{Pipeline, Stringable, HtmlBuilder}"]
+
+    subgraph helpers[" xoops/helpers "]
+        tiers["Tier 0 · Utility/
+        Tier 1 · Contracts/
+        Tier 2 · Service/
+        Tier 3 · Provider/
+        Tier 4 · Integration/"]
+    end
+
+    subgraph xmf[" xoops/xmf 2.0 "]
+        xmfcontent["requires xoops/helpers
+        ──────────────────────
+        Repository · EventBus · Container
+        QueryBuilder · CacheManager
+        ConfigManager · Presentation"]
+    end
+
+    Core["**XOOPS Core**
+    XOOPS_ROOT_PATH · XOOPS_URL · XoopsCache · XoopsObject"]
+
+    Module      --> helpers
+    Module      --> xmf
+    xmf         -->|"declares as dependency"| helpers
+    helpers     --> Core
+    xmf         --> Core
+
+    style Module     fill:#dbeafe,stroke:#3b82f6,color:#000
+    style tiers      fill:#f0fdf4,stroke:#86efac,color:#000
+    style helpers    fill:#dcfce7,stroke:#16a34a,color:#000
+    style xmf        fill:#fef9c3,stroke:#ca8a04,color:#000
+    style xmfcontent fill:#fef9c3,stroke:#ca8a04,color:#000
+    style Core       fill:#fce7f3,stroke:#db2777,color:#000
 ```
 
 **Tier 0 utilities work everywhere** — CLI scripts, cron jobs, migrations, standalone tools. No XOOPS boot required.
@@ -995,4 +1248,4 @@ class MyModuleTest extends TestCase
 
 *All "Old Way" examples are from real XOOPS Core 2.5 and production module code — not experiments or prototypes.*
 
-*XOOPS Helpers: 151 tests. 233 assertions. 43 source files. One `composer require`.*
+*XOOPS Helpers: 151 tests. 233 assertions. 41 source files. One `composer require`.*
