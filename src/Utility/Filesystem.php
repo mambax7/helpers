@@ -417,7 +417,10 @@ final class Filesystem
             new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS),
         );
 
-        $basePath = realpath($directory) ?: $directory;
+        // Strip any trailing separator so the prefix check and substr() below stay
+        // correct for a root base path too ("/" or "C:\"); otherwise the guard would
+        // build a doubled separator and skip every file, leaving an empty archive.
+        $basePath = rtrim(realpath($directory) ?: $directory, '/\\');
 
         foreach ($iterator as $file) {
             if ($file->isDir()) {
