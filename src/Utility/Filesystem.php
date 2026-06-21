@@ -429,10 +429,17 @@ final class Filesystem
 
             $realPath = $file->getRealPath();
 
-            // Skip anything that resolves outside the base directory (e.g. a symlink
-            // pointing elsewhere). Otherwise the relative path below would be wrong or
-            // empty and could leak content from outside the tree into the archive.
-            if ($realPath === false || !str_starts_with($realPath, $basePath . DIRECTORY_SEPARATOR)) {
+            if ($realPath === false) {
+                continue;
+            }
+
+            // Skip anything that resolves outside the base directory (e.g. an escaping
+            // symlink); otherwise the relative path below would be wrong/empty and could
+            // leak external content into the archive. Compare with forward-slash-normalised
+            // paths so a separator mix on Windows cannot break the check. $basePath has no
+            // trailing separator (rtrim above), so appending one yields exactly one.
+            $normalizedBase = str_replace('\\', '/', $basePath) . '/';
+            if (!str_starts_with(str_replace('\\', '/', $realPath), $normalizedBase)) {
                 continue;
             }
 
