@@ -426,7 +426,10 @@ final class Filesystem
 
             $realPath = $file->getRealPath();
 
-            if ($realPath === false) {
+            // Skip anything that resolves outside the base directory (e.g. a symlink
+            // pointing elsewhere). Otherwise the relative path below would be wrong or
+            // empty and could leak content from outside the tree into the archive.
+            if ($realPath === false || !str_starts_with($realPath, $basePath . DIRECTORY_SEPARATOR)) {
                 continue;
             }
 
