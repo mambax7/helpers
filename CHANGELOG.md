@@ -6,6 +6,34 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-07-22
+
+First stable release. No breaking changes since 1.0.0 Beta2.
+
+### Added
+
+- **`Service\HtmlSanitizer`** — shared HTMLPurifier front-end replacing the per-module
+  copy-paste that either disabled the definition cache (`Cache.DefinitionImpl => null`,
+  forcing a ~40–60 ms HTML-definition rebuild on every request) or let the default
+  serializer attempt writes inside `vendor/`. Definitions are serialized once into a
+  writable directory resolved via `Path::storage('caches/htmlpurifier')` and load in
+  ~1 ms afterwards; purifier instances are memoized per configuration for the rest of
+  the request. `ezyang/htmlpurifier` is an optional dependency — when it is absent
+  `purify()` and `purifier()` return `null` instead of throwing, so callers can fall
+  back to their own sanitizer.
+
+### Fixed
+
+- **`Utility\Benchmark::average()`** — now throws `InvalidArgumentException` when
+  `$iterations` is less than 1. Previously the averaging divided by zero and
+  `min()`/`max()` on the empty sample array raised a `ValueError` on PHP 8.
+- **`Utility\Filesystem::zip()`** — strips any trailing separator from the resolved base
+  path, so a root base (`/` or `C:\`) no longer builds a doubled separator that skipped
+  every file and produced an empty archive. Entries resolving outside the base directory
+  (for example via an escaping symlink) are now skipped rather than added, and the prefix
+  comparison normalises separators to forward slashes so a mixed-separator path on
+  Windows cannot defeat the check.
+
 ## [1.0.0 Beta2] — 2026-06-16
 
 ### Added
